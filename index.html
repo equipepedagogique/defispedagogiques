@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Roulette des 50 Défis Pédagogiques</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: radial-gradient(circle, #454739 0%, #2a2c24 100%);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #wheel-container {
+            position: relative;
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 600px;
+            max-height: 600px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            /* Temps de rotation réduit à 2 secondes */
+            transition: transform 2s cubic-bezier(0.15, 0, 0.15, 1);
+        }
+
+        #center-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: #fdfaf3;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(0,0,0,0.1);
+            z-index: 10;
+            user-select: none;
+            border: 4px solid #8c7851;
+            transition: transform 0.2s;
+        }
+
+        #center-button:active {
+            transform: translate(-50%, -50%) scale(0.9);
+        }
+
+        #center-button span {
+            font-weight: 800;
+            color: #5d5c45;
+            font-size: 14px;
+            text-align: center;
+            line-height: 1;
+        }
+
+        #pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            background: #d97706;
+            clip-path: polygon(50% 100%, 0 0, 100% 0);
+            z-index: 20;
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.3));
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(42, 44, 36, 0.9);
+            z-index: 50;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: #fdfaf3;
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: popIn 0.4s cubic-bezier(0.26, 0.53, 0.74, 1.48);
+            border: 1px solid #e5e0d0;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="wheel-container">
+        <div id="pointer"></div>
+        <canvas id="wheelCanvas"></canvas>
+        <div id="center-button" onclick="spin()">
+            <span>TOURNER<br>LA ROUE</span>
+        </div>
+    </div>
+
+    <!-- Modal pour le défi -->
+    <div id="modal" class="modal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div id="modal-number" class="text-6xl font-black text-amber-800 mb-2">#1</div>
+            <h2 id="modal-title" class="text-2xl font-bold text-stone-800 mb-4">Titre du défi</h2>
+            <p id="modal-description" class="text-stone-700 mb-6 leading-relaxed text-left"></p>
+            <button onclick="closeModal()" class="bg-amber-700 hover:bg-amber-800 text-white font-bold py-3 px-8 rounded-full transition shadow-lg">
+                C'est parti !
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const challenges = [
+            { id: 1, title: "Le défi du « cours sans PowerPoint »", desc: "Osez l’aventure : donnez votre prochain cours sans une seule diapositive ! Utilisez plutôt des objets, des schémas dessinés en direct ou des activités interactives. Ce défi favorise la créativité et la communication efficace." },
+            { id: 2, title: "Le défi « 10 minutes d’autonomie »", desc: "Accordez aux étudiants 10 minutes pour apprendre un concept… sans vous ! Fournissez des ressources variées et laissez-les s’organiser. Ce défi favorise l’autonomie et la responsabilisation." },
+            { id: 3, title: "Le défi « Évaluation surprise inversée »", desc: "Demandez aux étudiants de créer les critères d’évaluation pour un travail… avant de le réaliser. Ils deviennent co-concepteurs et comprennent mieux les attentes. Ce défi favorise l’analyse et la structuration de l’information." },
+            { id: 4, title: "Le défi « Classe renversée express »", desc: "Choisissez un concept clé et laissez les étudiants l’enseigner à leurs pairs. Vous devenez guide, pas conférencier. Ce défi favorise la vulgarisation et la transmission des savoirs." },
+            { id: 5, title: "Le défi « Apprendre dehors »", desc: "Déplacez votre activité à l’extérieur (si possible) et reliez le contenu à l’environnement. Une discussion sur la biodiversité ? Faites-la dans un parc ! Ce défi favorise la contextualisation des apprentissages." },
+            { id: 6, title: "Le défi « 3 erreurs volontaires »", desc: "Intégrez trois erreurs dans votre explication et demandez aux étudiants de les détecter. Ce jeu favorise l’esprit critique et l’écoute active." },
+            { id: 7, title: "Le défi « Minute créative »", desc: "À la fin du cours, demandez aux étudiants de résumer la matière en un dessin, un mème ou une analogie. Ce défi favorise la synthèse et la communication." },
+            { id: 8, title: "Le défi « Silence pédagogique »", desc: "Pendant 5 minutes, enseignez sans parler : utilisez gestes, images, ou écriture. Les étudiants doivent décoder. Ce défi favorise l’interprétation des messages non verbaux." },
+            { id: 9, title: "Le défi « 1 critère de performance, 3 contextes »", desc: "Choisissez un critère de performance et demandez aux étudiants de l’appliquer dans trois contextes différents (académique, professionnel, personnel). Ce défi favorise la transférabilité et la réflexion." },
+            { id: 10, title: "Le défi « Évaluation en duo »", desc: "Au lieu d’une correction individuelle, proposez une évaluation en binôme : les étudiants corrigent mutuellement leurs travaux avec une grille. Ce défi favorise la collaboration et la compréhension des critères." },
+            { id: 11, title: "Le défi « Capsule IA critique »", desc: "Utilisez une IA pour générer une réponse à une question du cours… puis demandez aux étudiants de la critiquer. Ce défi favorise l’analyse et la réflexion éthique." },
+            { id: 12, title: "Le défi « 5 minutes pour convaincre »", desc: "Chaque étudiant doit expliquer un concept en 5 minutes à un pair, sans notes. Ce défi favorise la clarté et la confiance en soi." },
+            { id: 13, title: "Le défi « Jeu de rôle surprise »", desc: "Transformez un concept en situation réelle : les étudiants incarnent des rôles (client, expert, etc.). Ce défi favorise l’action en contexte et la créativité." },
+            { id: 14, title: "Le défi « Feedback éclair »", desc: "Après une activité, chaque étudiant donne un feedback constructif à un pair… en 60 secondes chrono ! Ce défi favorise la rétroaction et l’écoute active." },
+            { id: 15, title: "Le défi « Carte mentale collective »", desc: "Construisez une carte conceptuelle en équipe pour résumer la matière. Ce défi favorise l’organisation de l’information et la collaboration." },
+            { id: 16, title: "Le défi « Chroniqueur du jour »", desc: "Un étudiant devient « chroniqueur » et résume la séance en 3 points clés à la fin du cours. Ce défi favorise la synthèse et la prise de parole." },
+            { id: 17, title: "Le défi « Débat inversé »", desc: "Organisez un débat où chaque étudiant défend la position opposée à la sienne. Ce défi favorise l’argumentation et l’ouverture d’esprit." },
+            { id: 18, title: "Le défi « Concept en 280 caractères »", desc: "Demandez aux étudiants de résumer un concept en 280 caractères (style tweet). Ce défi favorise la concision et la créativité." },
+            { id: 19, title: "Le défi « Évaluation sans notes »", desc: "Proposez une activité où la rétroaction qualitative remplace la note. Ce défi favorise l’autoévaluation et la réflexion." },
+            { id: 20, title: "Le défi « Apprentissage par le jeu »", desc: "Transformez un concept en jeu (quiz, escape game, bingo). Ce défi favorise la mobilisation des savoirs et le plaisir d’apprendre." },
+            { id: 21, title: "Le défi « Podcast étudiant »", desc: "Demandez aux étudiants de créer un mini-podcast pour expliquer un concept. Ce défi favorise la créativité et la communication orale." },
+            { id: 22, title: "Le défi « Infographie express »", desc: "Les étudiants résument un chapitre en une infographie visuelle. Ce défi favorise la synthèse et la pensée visuelle." },
+            { id: 23, title: "Le défi « Question puissante »", desc: "Chaque étudiant doit formuler une question qui stimule la réflexion collective. Ce défi favorise la curiosité et la pensée critique." },
+            { id: 24, title: "Le défi « Storytelling pédagogique »", desc: "Transformez un concept en histoire captivante racontée par les étudiants. Ce défi favorise la narration et l’imagination." },
+            { id: 25, title: "Le défi « Minute scientifique »", desc: "Un étudiant présente une découverte liée au cours en une minute. Ce défi favorise la vulgarisation et la précision." },
+            { id: 26, title: "Le défi « Brainstorming inversé »", desc: "Au lieu de trouver des solutions, les étudiants imaginent des problèmes liés au sujet. Ce défi favorise la créativité et la réflexion divergente." },
+            { id: 27, title: "Le défi « Quiz collaboratif »", desc: "Les étudiants créent ensemble un quiz pour réviser la matière. Ce défi favorise la coopération et la consolidation des savoirs." },
+            { id: 28, title: "Le défi « Concept en BD »", desc: "Demandez aux étudiants de représenter un concept sous forme de bande dessinée. Ce défi favorise la créativité et la compréhension visuelle." },
+            { id: 29, title: "Le défi « Minute philosophique »", desc: "Reliez le sujet du cours à une question existentielle et discutez. Ce défi favorise la réflexion et l’ouverture d’esprit." },
+            { id: 30, title: "Le défi « Prototype rapide »", desc: "Les étudiants conçoivent un prototype (objet, schéma) pour illustrer une idée. Ce défi favorise l’innovation et la pensée pratique." },
+            { id: 31, title: "Le défi « Émoji-révision »", desc: "Prépare une série de concepts du cours et vulgarise-les uniquement avec des émojis. Les étudiants doivent deviner le plus grand nombre possible en 5 minutes, en équipe ou en solo. Tu valides ensemble les réponses et précises les nuances. Ce défi favorise la révision active, la créativité et l’enthousiasme." },
+            { id: 32, title: "Le défi « Minute métaphore »", desc: "Choisis un concept ardu et demande aux étudiants de le transformer en métaphore parlante (cuisine, sport, voyage). Présentations express de 30 secondes, puis vote collectif pour la métaphore la plus claire. Tu complètes au besoin. Ce défi favorise la clarté, l’imagination et l’appropriation des idées." },
+            { id: 33, title: "Le défi « Dictionnaire vivant »", desc: "Crée un mur de termes-clés. En dyades, les étudiants rédigent une définition en mots simples et ajoutent un exemple concret lié au programme. Rotation pour bonifier les définitions. Tu fais une synthèse finale. Ce défi favorise la vulgarisation, la rigueur et l’ancrage dans le réel." },
+            { id: 34, title: "Le défi « Design d’erreurs »", desc: "Présente un mini-problème truffé d’erreurs typiques. Les équipes identifient, classent et corrigent les erreurs avec justification. Révélation des corrections et discussion sur les pièges. Tu fournis une fiche-mémo. Ce défi favorise l’analyse, la prévention des erreurs et la pensée stratégique." },
+            { id: 35, title: "Le défi « Speed consulting »", desc: "Installe des stations thématiques. En 2 minutes, un étudiant joue le consultant et aide un pair à débloquer une question. Changement de rôle et de station. Débrief collectif pour partager les meilleures astuces. Ce défi favorise l’entraide, la communication concise et la résolution rapide." },
+            { id: 36, title: "Le défi « Marche académique »", desc: "Sors pour une marche-discussion en binômes : une question par coin de rue, trois insights à rapporter. À l’arrivée, mise en commun des trouvailles et photo d’un tableau synthèse. Ce défi favorise la convivialité, la réflexion mobile et la consolidation des savoirs." },
+            { id: 37, title: "Le défi « Micro-projet 24 h »", desc: "Lance un mini-projet : prototype, capsule explicative ou étude de cas à livrer en 24 heures. Format libre, critères clairs, rétroaction rapide. Exposition des productions en classe. Ce défi favorise l’initiative, l’organisation et la transformation des idées en résultats tangibles." },
+            { id: 38, title: "Le défi « Fil rouge »", desc: "Choisis un thème transversal (durabilité, accessibilité, éthique). Les étudiants relient chaque notion du cours à ce fil rouge et illustrent par un exemple concret. Partage en plénière. Ce défi favorise la cohérence, la contextualisation et la vision systémique." },
+            { id: 39, title: "Le défi « Vidéo courte (type TikTok) en classe »", desc: "Sans publier en ligne, les étudiants enregistrent une capsule de 30 secondes expliquant une notion, avec un plan simple et un exemple. Visionnement et rétroaction en groupe, puis amélioration. Ce défi favorise la concision, la clarté et l’adaptation à des formats contemporains." },
+            { id: 40, title: "Le défi « PechaKucha express »", desc: "Propose une présentation ultra-dynamique : 10 images × 20 secondes. Les étudiants racontent une idée, un cas ou un processus en rythme. Discussion finale pour extraire l’essentiel. Ce défi favorise la structuration, la présence orale et la sélection des informations clés." },
+            { id: 41, title: "Le défi « Carte de preuves »", desc: "Demande aux étudiants de collecter des traces (exemples, données, expériences) qui soutiennent une affirmation du cours et de cartographier ces preuves. Partage et critique bienveillante. Ce défi favorise la rigueur, l’argumentation et la documentation des apprentissages." },
+            { id: 42, title: "Le défi « Bingo de notions »", desc: "Distribue des cartons avec des notions. Tu lis des définitions ou des exemples; ils cochent la case correspondante. Première ligne gagnante explique ses réponses. Variante : création collaborative des définitions. Ce défi favorise l’écoute active, la mémorisation et le plaisir ludique." },
+            { id: 43, title: "Le défi « Analogies croisées »", desc: "Chaque équipe propose une analogie pour une notion, puis l’échange avec une autre équipe qui doit l’améliorer ou la critiquer. Mise en commun des meilleures analogies et limites. Ce défi favorise la créativité, la précision et la discussion constructive." },
+            { id: 44, title: "Le défi « Atelier des rubriques »", desc: "Co-conçois avec les étudiants les descripteurs d’une grille d’évaluation pour une tâche à venir. Testez la grille sur un exemple, ajustez la formulation. Affiche finale de la grille en classe. Ce défi favorise la transparence, la co-responsabilité et la qualité des critères." },
+            { id: 45, title: "Le défi « Sources trompeuses »", desc: "Présente des sources volontairement douteuses (titres aguicheurs, biais, données opaques). Les étudiants les analysent avec une checklist et rédigent un verdict motivé. Débrief sur les signaux d’alerte. Ce défi favorise le discernement, l’esprit critique et l’éthique informationnelle." },
+            { id: 46, title: "Le défi « Escape-room de notions »", desc: "Crée une suite d’énigmes où chaque solution révèle une définition, une formule ou un principe du cours. Chrono de 15 minutes, indices limités, discussion post-jeu pour consolider. Ce défi favorise l’engagement, la collaboration et la réactivation des connaissances." },
+            { id: 47, title: "Le défi « Choix des priorités »", desc: "Demande aux équipes de choisir trois incontournables de la semaine et de justifier leur sélection avec exemples et implications. Confronte les listes pour dégager un consensus. Ce défi favorise la hiérarchisation, l’argumentation et la planification efficace." },
+            { id: 48, title: "Le défi « Reverse-engineering d’examen »", desc: "Remets un ancien examen et demande d’inférer ce qu’il fallait vraiment maîtriser, puis de concevoir un mini-plan d’étude. Partage des stratégies gagnantes. Ce défi favorise la lecture attentive, la rétroconception et la préparation méthodique." },
+            { id: 49, title: "Le défi « Studio d’affiches »", desc: "Organise une séance de création d’affiches académiques : titre accrocheur, visuel clair, données bien présentées. Galerie et critique bienveillante en fin de cours. Ce défi favorise la communication visuelle, la synthèse et l’esthétique au service des idées." },
+            { id: 50, title: "Le défi « Journal de bord sprint »", desc: "Propose un journal de bord en trois entrées : obstacle rencontré, stratégie testée, leçon retenue. Partage volontaire de deux entrées en classe et compilation des meilleures stratégies. Ce défi favorise la métacognition, la résilience et l’amélioration continue." }
+        ];
+
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const count = 50;
+        let currentRotation = 0;
+        let isSpinning = false;
+
+        // Palette de couleurs Earthy
+        const colors = [
+            '#6b705c', // Vert sauge foncé
+            '#a5a58d', // Sauge clair
+            '#b7b7a4', // Pierre
+            '#ffe8d6', // Sable
+            '#ddbea9', // Terre cuite claire
+            '#cb997e'  // Terre cuite
+        ];
+
+        function initWheel() {
+            const size = 1000;
+            canvas.width = size;
+            canvas.height = size;
+            drawWheel();
+        }
+
+        function drawWheel() {
+            const size = canvas.width;
+            const center = size / 2;
+            const radius = size / 2 - 20;
+            const arcSize = (2 * Math.PI) / count;
+
+            ctx.clearRect(0, 0, size, size);
+
+            for (let i = 0; i < count; i++) {
+                const angle = i * arcSize;
+                // Alternance de la palette earthy
+                ctx.fillStyle = colors[i % colors.length];
+                
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.arc(center, center, radius, angle, angle + arcSize);
+                ctx.lineTo(center, center);
+                ctx.fill();
+
+                // Ligne de séparation fine
+                ctx.strokeStyle = "rgba(255,255,255,0.1)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Numéros
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(angle + arcSize / 2);
+                ctx.textAlign = "right";
+                // Couleur de texte adaptée à la clarté du fond
+                ctx.fillStyle = (i % colors.length === 3 || i % colors.length === 4) ? "#5d5c45" : "white";
+                ctx.font = "bold 22px Poppins";
+                ctx.fillText(i + 1, radius - 40, 10);
+                ctx.restore();
+            }
+
+            // Bordure
+            ctx.strokeStyle = "#8c7851";
+            ctx.lineWidth = 12;
+            ctx.beginPath();
+            ctx.arc(center, center, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+
+            const extraDegrees = Math.floor(Math.random() * 360);
+            // On réduit le nombre de tours de 10 à 5 pour que ça aille plus vite
+            const totalRotation = currentRotation + (360 * 5) + extraDegrees;
+            
+            canvas.style.transform = `rotate(${totalRotation}deg)`;
+            currentRotation = totalRotation;
+
+            // On réduit le délai du timeout de 4000ms à 2000ms
+            setTimeout(() => {
+                isSpinning = false;
+                const actualRotation = totalRotation % 360;
+                const index = Math.floor(((360 - actualRotation + 270) % 360) / (360 / count));
+                showChallenge(index);
+            }, 2000);
+        }
+
+        function showChallenge(index) {
+            const challenge = challenges[index % count];
+            document.getElementById('modal-number').innerText = `#${challenge.id}`;
+            document.getElementById('modal-title').innerText = challenge.title;
+            document.getElementById('modal-description').innerText = challenge.desc;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        window.onload = initWheel;
+    </script>
+</body>
+</html>
